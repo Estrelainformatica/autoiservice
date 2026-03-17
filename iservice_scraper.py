@@ -10,6 +10,9 @@ Fluxo:
   7. Exportar a lista
   8. Aguarda modal → faz refresh a cada 5s até relatório disponível
   9. Baixa o .xlsx
+
+Renomeado de scraper.py para iservice_scraper.py para evitar conflito
+com o pacote pip 'scraper' (https://pypi.org/project/scraper/).
 """
 
 import asyncio
@@ -248,16 +251,11 @@ async def click_search(page: Page) -> None:
 
 async def _open_export_dropdown(page: Page) -> None:
     """Abre o menu dropdown de exportação no meio da página."""
-    # O botão de export tem uma seta < para baixo (el-icon-arrow-down)
-    # Tenta clicar especificamente no botão de exportação (não o de filtros)
     export_btn_selectors = [
-        # Botão com texto de exportar
         'button:has-text("Exportar"):visible',
         'span:has-text("Exportar"):visible',
-        # Seta de dropdown próxima a area de exportação (segunda ocorrência)
         '.export-btn i.el-icon-arrow-down',
         '.el-dropdown:has(.el-dropdown-menu__item:has-text("Exportar")) > button',
-        # Fallback: qualquer dropdown arrow visível no meio da página
         'i.el-icon-arrow-down:visible',
     ]
 
@@ -265,13 +263,11 @@ async def _open_export_dropdown(page: Page) -> None:
         try:
             locs = page.locator(sel)
             count = await locs.count()
-            # Tenta cada ocorrência
             for i in range(count):
                 loc = locs.nth(i)
                 if await loc.is_visible(timeout=500):
                     await loc.click()
                     await page.wait_for_timeout(600)
-                    # Verifica se menu abriu
                     menu = page.locator('.el-dropdown-menu:visible')
                     if await menu.is_visible(timeout=1000):
                         print(f"[scraper] Menu de exportação aberto via: {sel}")
@@ -318,7 +314,6 @@ async def handle_download_modal(page: Page) -> Path:
     for cycle in range(MAX_DOWNLOAD_CYCLES):
         await page.wait_for_timeout(5000)
 
-        # Verifica se ainda existem linhas em processamento
         waiting_rows = page.locator(
             '.el-table__body tr, .el-table__row'
         ).filter(
@@ -349,7 +344,6 @@ async def handle_download_modal(page: Page) -> Path:
                     pass
             continue
 
-        # Verifica se o botão de download está visível (sem display:none)
         download_btn_selectors = [
             "span.icon-download:visible",
             ".el-table__body tr:first-child span.icon-download:visible",
@@ -389,7 +383,6 @@ async def run() -> Path:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False, slow_mo=300)
 
-        # Reutiliza sessão salva se existir
         ctx_kwargs: dict = {"accept_downloads": True}
         if SESSION_FILE.exists():
             ctx_kwargs["storage_state"] = str(SESSION_FILE)
@@ -399,38 +392,28 @@ async def run() -> Path:
         page = await context.new_page()
 
         try:
-            # Navega para a URL base primeiro
             await page.goto(SITE_URL)
             await page.wait_for_load_state("networkidle")
             await page.wait_for_timeout(2000)
 
-            # Login se necessário
             if await _is_login_page(page):
                 await login(page, context)
             else:
                 print("[scraper] Sessão válida, login não necessário.")
 
-            # Navega direto para Consulta de OS
             await navigate_to_work_order(page)
 
-            # Verifica se foi redirecionado para login após navegação
             if await _is_login_page(page):
                 await login(page, context)
                 await navigate_to_work_order(page)
 
-            # Aplica filtros
             await clear_creation_date(page)
             await expand_filters(page)
             await set_sinalizador_pendente(page)
-
-            # Pesquisa
             await click_search(page)
-
-            # Exportação
             await export_by_model(page)
             await export_list(page)
 
-            # Download via modal
             file_path = await handle_download_modal(page)
             return file_path
 

@@ -16,7 +16,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from scraper import run as scrape
+from iservice_scraper import run as scrape
 from notion_sender import sync as send_to_notion
 
 
