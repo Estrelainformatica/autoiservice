@@ -383,12 +383,7 @@ async def run() -> Path:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False, slow_mo=300)
 
-        ctx_kwargs: dict = {"accept_downloads": True}
-        if SESSION_FILE.exists():
-            ctx_kwargs["storage_state"] = str(SESSION_FILE)
-            print(f"[scraper] Sessão anterior encontrada em {SESSION_FILE}. Reutilizando...")
-
-        context = await browser.new_context(**ctx_kwargs)
+        context = await browser.new_context(accept_downloads=True)
         page = await context.new_page()
 
         try:
@@ -396,16 +391,9 @@ async def run() -> Path:
             await page.wait_for_load_state("networkidle")
             await page.wait_for_timeout(2000)
 
-            if await _is_login_page(page):
-                await login(page, context)
-            else:
-                print("[scraper] Sessão válida, login não necessário.")
+            await login(page, context)
 
             await navigate_to_work_order(page)
-
-            if await _is_login_page(page):
-                await login(page, context)
-                await navigate_to_work_order(page)
 
             await clear_creation_date(page)
             await expand_filters(page)
